@@ -205,6 +205,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-portfolio-out
-
 # End of https://www.toptal.com/developers/gitignore/api/osx,node,linux,windows,sam
