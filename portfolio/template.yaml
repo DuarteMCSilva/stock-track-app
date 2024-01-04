@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: New transaction workflow
+Globals:
+  Function:
+    Timeout: 15
+Parameters:
+  STAGE:
+    Type: String
+    Default: dev
+  TransactionsDBTable:
+    Type: String
+    Default: TransactionsDB
+Resources:
+  MyApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref STAGE
+  PortfolioExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub states.${AWS::Region}.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: StatesExecutionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: '*'
+  NewTransactionStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn: !GetAtt PortfolioExecutionRole.Arn
+      Definition:
+        Comment: New transaction workflow
+        StartAt: Validate Transaction
+        States:
+          Validate Transaction:
+            Comment: Check if the transaction is valid.
+            Type: Pass
+            Next: Is Transaction Valid
+          Is Transaction Valid:
+            Type: Choice
+            Choices:
+              - Variable: $.valid
+                BooleanEquals: false
+                Next: FailState
+              - Variable: $.valid
+                BooleanEquals: true
+                Next: Save to DB
+          Save to DB:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload.$: $
+              FunctionName: !Sub ${PostTransactionFunction}
+            Next: SuccessState
+          SuccessState:
+            Type: Succeed
+          FailState:
+            Type: Fail
+  PostTransactionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-postTransactionLambda
+      Description: Submit a new transaction
+      CodeUri: handler/
+      Environment:
+        Variables:
+          DynamoTable: !Ref TransactionsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+      Handler: app.postTransaction
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      Events:
+        PostTransaction:
+          Type: Api
+          Properties:
+            Path: /transaction
+            Method: POST
+            RestApiId: !Ref MyApiGateway
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TransactionsDBTable
+      AttributeDefinitions:
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: date
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+Outputs:
+  MyApiGateway:
+    Description: API Gateway endpoint URL for Prod stage for Feedback function
+    Value: !Sub https://${MyApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${STAGE}/transaction/
+  StateMachine:
+    Description: StateMachine ARN
+    Value: !GetAtt NewTransactionStateMachine.Arn
+  PostTransactionFunction:
+    Description: POST Transaction Lambda Function ARN
+    Value: !GetAtt PostTransactionFunction.Arn
+  TransactionsTable:
+    Description: TransactionsDBTable ARN
+    Value: !GetAtt TransactionsTable.Arn
