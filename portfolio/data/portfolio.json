@@ -1,0 +1,10 @@
+{
+    "items": [
+        { "ticker": "AAPL", "quantity": 3, "buyPrice": 79.00, "accDividend": 5.99 },
+        { "ticker": "PG", "quantity": 3, "buyPrice": 158.00, "accDividend": 62.34 },
+        { "ticker": "BABA", "quantity": 5, "buyPrice": 179.00, "accDividend": 15.99 },
+        { "ticker": "PGR", "quantity": 2, "buyPrice": 79.00, "accDividend": 2.99 },
+        { "ticker": "KO", "quantity": 6, "buyPrice": 39.00, "accDividend": 3.99 },
+        { "ticker": "PEP", "quantity": 5, "buyPrice": 59.00, "accDividend": 7.29 }
+    ]
+}
