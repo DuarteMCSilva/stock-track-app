@@ -25,7 +25,10 @@ The track app tracks data and is a way to fullfill a personal need, while applyi
 
 ## Workflows
 
-1. New transaction -> 
+1. GET Portfolio
+
+2. POST transaction 
+    ![new transaction](relative%20path/../images/new_transaction.png)
 
 ## External API
 
@@ -41,7 +44,7 @@ The track app tracks data and is a way to fullfill a personal need, while applyi
 1. Portfolio: 
 TICKER | Quantity | BuyPrice 
 2. Transactions
-DATE | TICKER | VALUE | TYPE | Quantity | TAXES 
+DATE | orderType | TICKER | Quantity | VALUE | FEES
 
 
 

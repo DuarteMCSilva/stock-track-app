@@ -1,0 +1,10 @@
+{
+    "items": [
+        { "date": "19971301", "orderType": "buy", "ticker": "AAPL", "quantity": 3, "price": 79.00, "fees": 5.99 },
+        { "date": "19971301", "orderType": "buy", "ticker": "PG", "quantity": 3, "price": 158.00, "fees": 5.99 },
+        { "date": "19971301", "orderType": "buy", "ticker": "PGR", "quantity": 2, "price": 158.00, "fees": 5.99 },
+        { "date": "19971301", "orderType": "buy", "ticker": "BABA", "quantity": 5, "price": 158.00, "fees": 5.99 },
+        { "date": "19971301", "orderType": "buy", "ticker": "KO", "quantity": 6, "price": 158.00, "fees": 5.99 },
+        { "date": "19971301", "orderType": "buy", "ticker": "PEP", "quantity": 5, "price": 158.00, "fees": 5.99 }
+    ]
+}
