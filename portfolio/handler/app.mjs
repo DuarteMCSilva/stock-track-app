@@ -11,6 +11,8 @@
  * 
  */
 import AWS from 'aws-sdk';
+import { v1 as uuid } from 'uuid';
+
 let dynamoClient = new AWS.DynamoDB.DocumentClient();
 const DYNAMO_TABLE = process.env.DynamoTable;
 
@@ -24,12 +26,7 @@ const requestCallback = (err, data) => {
 };
 
 export const postTransaction = async (event, context) => {
-    // TODO: Clear unnecessary logs after finishing workflow.
-    console.log(event);
-
     const reqEvent = JSON.parse(JSON.stringify(event));
-    console.log('Table: ' + DYNAMO_TABLE);
-    console.log('Dynamo client defined: ' + !!dynamoClient);
 
     if (!DYNAMO_TABLE || !dynamoClient) {
         return {
@@ -38,10 +35,8 @@ export const postTransaction = async (event, context) => {
         }
     }
     const reqBody = parsedRequestBody(reqEvent.body);
-    console.log(reqBody)
 
     const transactionItem = reqBody.item;
-    console.log(transactionItem)
 
     const date = transactionItem.date;
     const orderType = transactionItem.orderType;
@@ -49,10 +44,6 @@ export const postTransaction = async (event, context) => {
     const quantity = +transactionItem.quantity;
     const price = +transactionItem.price;
     const fees = +transactionItem.fees;
-
-    console.log(date)
-    console.log(ticker)
-    console.log(orderType)
 
     const invalidInput = !transactionItem || !date || !orderType || !ticker
 
@@ -65,12 +56,10 @@ export const postTransaction = async (event, context) => {
 
     const params =  { 
         TableName: DYNAMO_TABLE,
-        Item: {
+        Item: { id: uuid(),
             date, orderType, ticker, quantity, price, fees
         }
     }
-
-    console.log(params)
 
     const result = await dynamoClient.put(params, requestCallback).promise();
 

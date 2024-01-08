@@ -132,10 +132,10 @@ Resources:
     Properties:
       TableName: !Ref TransactionsDBTable
       AttributeDefinitions:
-        - AttributeName: date
+        - AttributeName: id
           AttributeType: S
       KeySchema:
-        - AttributeName: date
+        - AttributeName: id
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
   PortfolioTable:
