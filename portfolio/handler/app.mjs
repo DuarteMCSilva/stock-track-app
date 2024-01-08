@@ -28,8 +28,8 @@ export const postTransaction = async (event, context) => {
     console.log(event);
 
     const reqEvent = JSON.parse(JSON.stringify(event));
-    console.log('Table: ' + DYNAMO_TABLE)
-    console.log('Dynamo client defined: ' + !!dynamoClient)
+    console.log('Table: ' + DYNAMO_TABLE);
+    console.log('Dynamo client defined: ' + !!dynamoClient);
 
     if (!DYNAMO_TABLE || !dynamoClient) {
         return {
@@ -82,13 +82,8 @@ export const postTransaction = async (event, context) => {
 };
 
 export const recalculatePricesHandler = async (event, context) => {
-    // TODO: Implement recalculation
-    // TODO: Clear unnecessary logs after finishing workflow.
-    console.log(event);
-
+    // TODO: Distribute responsability and improve code readability. 
     const reqEvent = JSON.parse(JSON.stringify(event));
-    console.log('Table: ' + DYNAMO_TABLE)
-    console.log('Dynamo client defined: ' + !!dynamoClient)
 
     if (!DYNAMO_TABLE || !dynamoClient) {
         return {
@@ -97,12 +92,10 @@ export const recalculatePricesHandler = async (event, context) => {
         }
     }
     const reqBody = parsedRequestBody(reqEvent.body);
-    console.log(reqBody)
 
-    const transactionItem = reqBody.item;
-    console.log(transactionItem)
+    const newTransaction = reqBody.item;
 
-    const ticker = transactionItem.ticker;
+    const ticker = newTransaction.ticker;
 
     const invalidInput = !ticker;
 
@@ -113,24 +106,84 @@ export const recalculatePricesHandler = async (event, context) => {
         }
     }
 
-    const params =  { 
+    const getParams = {
         TableName: DYNAMO_TABLE,
-        Key: { ticker: ticker }
+        Key: { ticker: ticker },
+    };
+    const putParams = {
+        TableName: DYNAMO_TABLE,
+        Item: {},
+    };
+
+    const existingEntry = await dynamoClient
+        .get(getParams, requestCallback)
+        .promise().then( (res) => res.Item );
+
+    if (!existingEntry?.ticker) {
+        putParams.Item = {
+        ticker,
+        quantity: +newTransaction.quantity,
+        buyPrice: +newTransaction.price,
+        histDividend: 0,
+        };
+        const response = await dynamoClient
+        .put(putParams, requestCallback)
+        .promise();
+        return {
+        statusCode: 200,
+        body: `Created new entry: ${response}`,
+        };
     }
 
-    const result = await dynamoClient.get(params, requestCallback).promise();
+    const totalQt = existingEntry.quantity + newTransaction.quantity;
+    const newAvgPrice = recalculateAvgPrice(existingEntry, newTransaction);
+    const newDividend = +(existingEntry.histDividend + newTransaction.dividend).toFixed(2);
+
+    if (totalQt < 0 || newAvgPrice < 0 || newDividend < 0) {
+        return {
+        statusCode: 400,
+        body: "Some quantities have invalid (negative) values!",
+        };
+    }
+
+    if (totalQt === 0) {
+        const response = await dynamoClient.delete(getParams, requestCallback).promise();
+        return {
+            statusCode: 200,
+            body: `End of position: ${response}`,
+        };
+    }
+
+    putParams.Item = {
+        ticker,
+        quantity: +totalQt,
+        buyPrice: +newAvgPrice,
+        histDividend: +newDividend
+    };
+
+    const response = await dynamoClient
+        .put(putParams, requestCallback)
+        .promise();
 
     return {
-        'statusCode': 200,
-        'body': JSON.stringify( result )
-    }
+        statusCode: 200,
+        body: `Updated entry: ${response}`,
+    };
 };
 
 function parsedRequestBody(body) {
-    if(!body) return '';
-    if(typeof body === 'string'){
+    if (!body) return "";
+    if (typeof body === "string") {
         return JSON.parse(body);
     } else {
         return JSON.parse(JSON.stringify(body));
     }
-};
+}
+
+function recalculateAvgPrice(existingEntry, newTransaction) {
+  const totalQt = existingEntry.quantity + newTransaction.quantity;
+  const exTotalPrice = existingEntry.quantity * existingEntry.buyPrice;
+  const newTransTotalPrice = newTransaction.quantity * newTransaction.price;
+  const newAvgPrice = (exTotalPrice + newTransTotalPrice)/totalQt;
+  return +newAvgPrice.toFixed(5);
+}

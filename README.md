@@ -42,7 +42,7 @@ The track app tracks data and is a way to fullfill a personal need, while applyi
 
 ### Tables:
 1. Portfolio: 
-TICKER | Quantity | BuyPrice 
+TICKER | Quantity | BuyPrice | HistDividend 
 2. Transactions
 DATE | orderType | TICKER | Quantity | VALUE | FEES
 

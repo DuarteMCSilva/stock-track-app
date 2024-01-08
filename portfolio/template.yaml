@@ -66,9 +66,8 @@ Resources:
             Type: Parallel
             Next: SuccessState
             Branches:
-              -
-                StartAt: Save to DB
-                States: 
+              - StartAt: Save to DB
+                States:
                   Save to DB:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
@@ -76,8 +75,7 @@ Resources:
                       Payload.$: $
                       FunctionName: !Sub ${PostTransactionFunction}
                     End: true
-              -
-                StartAt: Recalculate Prices
+              - StartAt: Recalculate Prices
                 States:
                   Recalculate Prices:
                     Type: Task
