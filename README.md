@@ -46,6 +46,25 @@ TICKER | Quantity | BuyPrice | HistDividend
 2. Transactions
 DATE | orderType | TICKER | Quantity | VALUE | FEES
 
+### Testing Execution Example
+
+```
+{
+    "valid": true,
+    "body": {
+        "item": {
+        "date": "20180118",
+        "ticker": "BABA",
+        "price": 75.43,
+        "quantity": 32,
+        "fees": 3.42,
+        "dividend": 0,
+        "orderType": "BUY"
+        }
+    }
+}
+```
+
 
 
 
