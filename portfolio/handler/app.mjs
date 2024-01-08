@@ -14,9 +14,9 @@ import AWS from 'aws-sdk';
 let dynamoClient = new AWS.DynamoDB.DocumentClient();
 const DYNAMO_TABLE = process.env.DynamoTable;
 
-const putCallback = (err, data) => {
+const requestCallback = (err, data) => {
     if(err){
-        throw new Error(`Failed to persist!`);
+        throw new Error(`Failed!`);
     } else {
         console.log("Success!");
         return data;
@@ -72,9 +72,54 @@ export const postTransaction = async (event, context) => {
 
     console.log(params)
 
-    const result = await dynamoClient.put(params, putCallback).promise();
+    const result = await dynamoClient.put(params, requestCallback).promise();
 
     console.log(result)
+    return {
+        'statusCode': 200,
+        'body': JSON.stringify( result )
+    }
+};
+
+export const recalculatePricesHandler = async (event, context) => {
+    // TODO: Implement recalculation
+    // TODO: Clear unnecessary logs after finishing workflow.
+    console.log(event);
+
+    const reqEvent = JSON.parse(JSON.stringify(event));
+    console.log('Table: ' + DYNAMO_TABLE)
+    console.log('Dynamo client defined: ' + !!dynamoClient)
+
+    if (!DYNAMO_TABLE || !dynamoClient) {
+        return {
+            'statusCode': 500,
+            'body': "Environment Error!"
+        }
+    }
+    const reqBody = parsedRequestBody(reqEvent.body);
+    console.log(reqBody)
+
+    const transactionItem = reqBody.item;
+    console.log(transactionItem)
+
+    const ticker = transactionItem.ticker;
+
+    const invalidInput = !ticker;
+
+    if( invalidInput ) {
+        return {
+            'statusCode': 400,
+            'body': "Invalid input format!"
+        }
+    }
+
+    const params =  { 
+        TableName: DYNAMO_TABLE,
+        Key: { ticker: ticker }
+    }
+
+    const result = await dynamoClient.get(params, requestCallback).promise();
+
     return {
         'statusCode': 200,
         'body': JSON.stringify( result )

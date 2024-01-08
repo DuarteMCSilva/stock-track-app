@@ -11,6 +11,9 @@ Parameters:
   TransactionsDBTable:
     Type: String
     Default: TransactionsDB
+  PortfolioDBTable:
+    Type: String
+    Default: PortfolioDB
 Resources:
   MyApiGateway:
     Type: AWS::Serverless::Api
@@ -58,14 +61,31 @@ Resources:
                 Next: FailState
               - Variable: $.valid
                 BooleanEquals: true
-                Next: Save to DB
-          Save to DB:
-            Type: Task
-            Resource: arn:aws:states:::lambda:invoke
-            Parameters:
-              Payload.$: $
-              FunctionName: !Sub ${PostTransactionFunction}
+                Next: ParallelState
+          ParallelState:
+            Type: Parallel
             Next: SuccessState
+            Branches:
+              -
+                StartAt: Save to DB
+                States: 
+                  Save to DB:
+                    Type: Task
+                    Resource: arn:aws:states:::lambda:invoke
+                    Parameters:
+                      Payload.$: $
+                      FunctionName: !Sub ${PostTransactionFunction}
+                    End: true
+              -
+                StartAt: Recalculate Prices
+                States:
+                  Recalculate Prices:
+                    Type: Task
+                    Resource: arn:aws:states:::lambda:invoke
+                    Parameters:
+                      Payload.$: $
+                      FunctionName: !Sub ${RecalculatePricesFunction}
+                    End: true
           SuccessState:
             Type: Succeed
           FailState:
@@ -93,6 +113,22 @@ Resources:
             Path: /transaction
             Method: POST
             RestApiId: !Ref MyApiGateway
+  RecalculatePricesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-recalculatePricesLambda
+      Description: Recalculates prices & dividends, in case the ticker exists in the portfolio.
+      CodeUri: handler/
+      Environment:
+        Variables:
+          DynamoTable: !Ref PortfolioTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PortfolioTable
+      Handler: app.recalculatePricesHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
   TransactionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -102,6 +138,17 @@ Resources:
           AttributeType: S
       KeySchema:
         - AttributeName: date
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+  PortfolioTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref PortfolioDBTable
+      AttributeDefinitions:
+        - AttributeName: ticker
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ticker
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
 Outputs:
