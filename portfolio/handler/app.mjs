@@ -18,6 +18,7 @@ const DYNAMO_TABLE = process.env.DynamoTable;
 
 const requestCallback = (err, data) => {
     if(err){
+        console.log(data);
         throw new Error(`Failed!`);
     } else {
         console.log("Success!");
@@ -25,73 +26,105 @@ const requestCallback = (err, data) => {
     }
 };
 
-export const postTransaction = async (event, context) => {
-    const reqEvent = JSON.parse(JSON.stringify(event));
+export const validateTransaction = async (event, context) => {
+    const inputEvent = JSON.parse(JSON.stringify(event));
 
+    const transactionItem = inputEvent.body.item;
+    console.log(transactionItem);
+
+    let quantity;
+    let dividend;
+
+    const orderType = transactionItem?.orderType ?? '';
+    const orderTypes = ['BUY', 'SELL', 'DIV'];
+    const invalidOrderType = !orderTypes.includes(orderType.toUpperCase());
+    
+    
+    if(orderType === 'BUY'){
+        quantity = Math.abs(+transactionItem?.quantity);
+        dividend = 0;
+    } else if (orderType === 'SELL'){
+        quantity = -Math.abs(+transactionItem?.quantity);
+        dividend = 0;
+    } else {
+        quantity = 0;
+        dividend = transactionItem.dividend ? Math.abs(transactionItem.dividend) : 0
+    }
+    const invalidQuantity = isNaN(quantity) || (quantity === 0 && orderType !== 'DIV');
+    const invalidDividend = isNaN(dividend);
+
+    const price = +transactionItem?.price;
+    const invalidPrice = price < 0; 
+
+    const date = transactionItem?.date;
+    const ticker = transactionItem?.ticker.toUpperCase();
+
+    let fees = +transactionItem?.fees;
+    fees = !fees ? 0 : Math.abs(fees);
+     
+    if( invalidOrderType || invalidQuantity || invalidDividend || invalidPrice || !date || !ticker ) {
+        const log = {
+          invalidOrderType,
+          invalidQuantity,
+          invalidDividend,
+          invalidPrice,
+          invalidDate: !date,
+          invalidTicker: !ticker,
+        };
+        return {
+            valid: false,
+            statusCode: 400,
+            body: "Invalid input format! ",
+            input: JSON.stringify(log)
+        }
+    }
+    
+    
+    const output = {
+      valid: true,
+      body: { date, orderType, ticker, quantity, price, fees, dividend },
+    };
+    return output;
+}
+
+export const postTransaction = async (event, context) => {
     if (!DYNAMO_TABLE || !dynamoClient) {
         return {
-            'statusCode': 500,
-            'body': "Environment Error!"
+            statusCode: 500,
+            body: "Environment Error!"
         }
     }
-    const reqBody = parsedRequestBody(reqEvent.body);
+    const reqBody = event.body;
 
-    const transactionItem = reqBody.item;
-
-    const date = transactionItem.date;
-    const orderType = transactionItem.orderType;
-    const ticker = transactionItem.ticker;
-    const quantity = +transactionItem.quantity;
-    const price = +transactionItem.price;
-    const fees = +transactionItem.fees;
-
-    const invalidInput = !transactionItem || !date || !orderType || !ticker
-
-    if( invalidInput ) {
-        return {
-            'statusCode': 400,
-            'body': "Invalid input format!"
-        }
-    }
-
-    const params =  { 
-        TableName: DYNAMO_TABLE,
-        Item: { id: uuid(),
-            date, orderType, ticker, quantity, price, fees
-        }
-    }
+    const params = {
+      TableName: DYNAMO_TABLE,
+      Item: {
+        id: uuid(),
+        date: reqBody.date,
+        orderType: reqBody.orderType,
+        ticker: reqBody.ticker,
+        quantity: reqBody.quantity,
+        price: reqBody.price,
+        fees: reqBody.fees
+      },
+    };
 
     const result = await dynamoClient.put(params, requestCallback).promise();
-
-    console.log(result)
     return {
-        'statusCode': 200,
-        'body': JSON.stringify( result )
+        statusCode: 200,
+        body: JSON.stringify( result ),
+        message: "Created new entry!"
     }
 };
 
 export const recalculatePricesHandler = async (event, context) => {
-    // TODO: Distribute responsability and improve code readability. 
-    const reqEvent = JSON.parse(JSON.stringify(event));
+    const newTransaction = event.body;
+    const ticker = newTransaction.ticker;
 
     if (!DYNAMO_TABLE || !dynamoClient) {
         return {
             'statusCode': 500,
             'body': "Environment Error!"
-        }
-    }
-    const reqBody = parsedRequestBody(reqEvent.body);
-
-    const newTransaction = reqBody.item;
-
-    const ticker = newTransaction.ticker;
-
-    const invalidInput = !ticker;
-
-    if( invalidInput ) {
-        return {
-            'statusCode': 400,
-            'body': "Invalid input format!"
         }
     }
 
@@ -107,12 +140,11 @@ export const recalculatePricesHandler = async (event, context) => {
     const existingEntry = await dynamoClient
         .get(getParams, requestCallback)
         .promise().then( (res) => res.Item );
-
     if (!existingEntry?.ticker) {
         putParams.Item = {
         ticker,
-        quantity: +newTransaction.quantity,
-        buyPrice: +newTransaction.price,
+        quantity: newTransaction.quantity,
+        buyPrice: newTransaction.price,
         histDividend: 0,
         };
         const response = await dynamoClient
@@ -145,9 +177,9 @@ export const recalculatePricesHandler = async (event, context) => {
 
     putParams.Item = {
         ticker,
-        quantity: +totalQt,
-        buyPrice: +newAvgPrice,
-        histDividend: +newDividend
+        quantity: totalQt,
+        buyPrice: newAvgPrice,
+        histDividend: newDividend
     };
 
     const response = await dynamoClient
@@ -160,19 +192,10 @@ export const recalculatePricesHandler = async (event, context) => {
     };
 };
 
-function parsedRequestBody(body) {
-    if (!body) return "";
-    if (typeof body === "string") {
-        return JSON.parse(body);
-    } else {
-        return JSON.parse(JSON.stringify(body));
-    }
-}
-
 function recalculateAvgPrice(existingEntry, newTransaction) {
   const totalQt = existingEntry.quantity + newTransaction.quantity;
   const exTotalPrice = existingEntry.quantity * existingEntry.buyPrice;
   const newTransTotalPrice = newTransaction.quantity * newTransaction.price;
   const newAvgPrice = (exTotalPrice + newTransTotalPrice)/totalQt;
-  return +newAvgPrice.toFixed(5);
+  return +newAvgPrice.toFixed(4);
 }

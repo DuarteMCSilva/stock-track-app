@@ -51,17 +51,19 @@ Resources:
         States:
           Validate Transaction:
             Comment: Check if the transaction is valid.
-            Type: Pass
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload.$: $
+              FunctionName: !Sub ${InputValidationFunction}
             Next: Is Transaction Valid
           Is Transaction Valid:
             Type: Choice
             Choices:
-              - Variable: $.valid
-                BooleanEquals: false
-                Next: FailState
-              - Variable: $.valid
+              - Variable: $.Payload.valid
                 BooleanEquals: true
                 Next: ParallelState
+            Default: FailState
           ParallelState:
             Type: Parallel
             Next: SuccessState
@@ -72,7 +74,7 @@ Resources:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
                     Parameters:
-                      Payload.$: $
+                      Payload.$: $.Payload
                       FunctionName: !Sub ${PostTransactionFunction}
                     End: true
               - StartAt: Recalculate Prices
@@ -81,7 +83,7 @@ Resources:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
                     Parameters:
-                      Payload.$: $
+                      Payload.$: $.Payload
                       FunctionName: !Sub ${RecalculatePricesFunction}
                     End: true
           SuccessState:
@@ -124,6 +126,16 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref PortfolioTable
       Handler: app.recalculatePricesHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+  InputValidationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-validateTransactionLambda
+      Description: Parsing and Validation of transaction input.
+      CodeUri: handler/
+      Handler: app.validateTransaction
       Runtime: nodejs18.x
       Architectures:
         - x86_64

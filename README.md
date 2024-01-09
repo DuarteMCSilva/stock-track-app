@@ -50,7 +50,6 @@ DATE | orderType | TICKER | Quantity | VALUE | FEES
 
 ```
 {
-    "valid": true,
     "body": {
         "item": {
         "date": "20180118",
