@@ -62,30 +62,47 @@ Resources:
             Choices:
               - Variable: $.Payload.valid
                 BooleanEquals: true
-                Next: ParallelState
+                Next: Parallel States
             Default: FailState
-          ParallelState:
+          Parallel States:
             Type: Parallel
-            Next: SuccessState
+            Next: Is Transaction Possible
             Branches:
-              - StartAt: Save to DB
+              - StartAt: Validate Possible Transaction
                 States:
-                  Save to DB:
+                  Validate Possible Transaction:
                     Type: Task
                     Resource: arn:aws:states:::lambda:invoke
                     Parameters:
                       Payload.$: $.Payload
-                      FunctionName: !Sub ${PostTransactionFunction}
+                      FunctionName: !Sub ${CheckTransactionPossibleFunction}
                     End: true
-              - StartAt: Recalculate Prices
+              - StartAt: Request Payload Token
                 States:
-                  Recalculate Prices:
-                    Type: Task
-                    Resource: arn:aws:states:::lambda:invoke
-                    Parameters:
-                      Payload.$: $.Payload
-                      FunctionName: !Sub ${RecalculatePricesFunction}
+                  Request Payload Token:
+                    Type: Pass
                     End: true
+          Is Transaction Possible:
+            Type: Choice
+            Choices:
+              - Variable: $[0].Payload.possible
+                BooleanEquals: true
+                Next: POST Transaction
+            Default: FailState
+          POST Transaction:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload.$: $[1].Payload
+              FunctionName: !Sub ${PostTransactionFunction}
+            Next: Recalculate Prices
+          Recalculate Prices:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              Payload.$: $.Payload
+              FunctionName: !Sub ${RecalculatePricesFunction}
+            Next: SuccessState
           SuccessState:
             Type: Succeed
           FailState:
@@ -139,6 +156,22 @@ Resources:
       Runtime: nodejs18.x
       Architectures:
         - x86_64
+  CheckTransactionPossibleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-checkTransactionPossibleLambda
+      Description: Check if there is enough balance or stocks in the porfolio to perform the transaction.
+      CodeUri: handler/
+      Handler: app.checkTransactionPossible
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          DynamoTable: !Ref PortfolioTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PortfolioTable
   TransactionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
