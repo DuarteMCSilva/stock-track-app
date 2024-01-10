@@ -119,9 +119,11 @@ export const checkTransactionPossible = async (event, context) => {
 
     const finalPositionQ = existingQuantity + requestedQuantity;
 
+    const sellCriteria = orderType === 'SELL' && finalPositionQ >= 0;
+    const divCriteria = orderType === 'DIV' && existingQuantity > 0;
     return {
         statusCode: 200,
-        possible: finalPositionQ >= 0
+        possible: sellCriteria || divCriteria
     }
 }
 
