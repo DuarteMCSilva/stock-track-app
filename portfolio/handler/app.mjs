@@ -78,13 +78,53 @@ export const validateTransaction = async (event, context) => {
             input: JSON.stringify(log)
         }
     }
-    
-    
     const output = {
       valid: true,
       body: { date, orderType, ticker, quantity, price, fees, dividend },
     };
     return output;
+}
+
+export const checkTransactionPossible = async (event, context) => {
+    const inputEvent = JSON.parse(JSON.stringify(event));
+
+    const transactionItem = inputEvent.body;
+
+    const ticker = transactionItem.ticker;
+    const orderType = transactionItem.orderType;
+    const requestedQuantity = transactionItem.quantity;
+
+    if(orderType === 'BUY') {
+        return {
+            statusCode: 200,
+            possible: true
+        }
+    }
+
+    if (!DYNAMO_TABLE || !dynamoClient) {
+        return {
+            'statusCode': 500,
+            'body': "Environment Error!"
+        }
+    }
+
+    const getParams = {
+        TableName: DYNAMO_TABLE,
+        Key: { ticker: ticker },
+    };
+
+    const existingQuantity = await dynamoClient
+        .get(getParams, requestCallback)
+        .promise().then( (res) => res.Item.quantity );
+
+    const finalPositionQ = existingQuantity + requestedQuantity;
+
+    const sellCriteria = orderType === 'SELL' && finalPositionQ >= 0;
+    const divCriteria = orderType === 'DIV' && existingQuantity > 0;
+    return {
+        statusCode: 200,
+        possible: sellCriteria || divCriteria
+    }
 }
 
 export const postTransaction = async (event, context) => {
@@ -109,10 +149,10 @@ export const postTransaction = async (event, context) => {
       },
     };
 
-    const result = await dynamoClient.put(params, requestCallback).promise();
+    await dynamoClient.put(params, requestCallback).promise();
     return {
         statusCode: 200,
-        body: JSON.stringify( result ),
+        body: reqBody,
         message: "Created new entry!"
     }
 };
