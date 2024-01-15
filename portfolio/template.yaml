@@ -201,9 +201,9 @@ Outputs:
   StateMachine:
     Description: StateMachine ARN
     Value: !GetAtt NewTransactionStateMachine.Arn
-  PostTransactionFunction:
-    Description: POST Transaction Lambda Function ARN
-    Value: !GetAtt PostTransactionFunction.Arn
   TransactionsTable:
     Description: TransactionsDBTable ARN
     Value: !GetAtt TransactionsTable.Arn
+  TransactionsTable:
+    Description: PortfolioTable ARN
+    Value: !GetAtt PortfolioTable.Arn
