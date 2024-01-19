@@ -2,12 +2,13 @@ const fs = require('fs');
 const Papa = require('papaparse');
 
 async function importer() {
+    let parsedData; 
     const path = './Transactions.csv'
-    const object = fs.readFile(path, 'utf8', (err, data) => {
-        const parsed = Papa.parse(data, {
+    fs.readFile(path, 'utf8', (err, data) => {
+        Papa.parse(data, {
             header: true,
             complete: (results) => {
-                const parsedData = results.data
+                const parData = results.data
                     .map((entry) => {
                         const compatible = {
                             date: entry.Data,
@@ -24,14 +25,15 @@ async function importer() {
                             time: entry.Hora
                         };
                     });
-                return parsedData;
+                parsedData = parData;
+                console.log(parsedData);
             }
         });
-        // console.log(parsed.complete);
-
-        return parsed;
+        return parsedData;
     });
-    return object;
+
+    // const object = fs.readFileSync(path, 'utf-8');
+    return parsedData;
 }
 
 console.log(importer());
