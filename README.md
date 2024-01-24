@@ -2,9 +2,7 @@
 
 The track app tracks data and is a way to fullfill a personal need, while applying the professional skills that I'm interested in.
 
-## Users
-
-
+## User Journey
 
 
 ## Features
